@@ -1,5 +1,3 @@
-package seesaw;
-
 import javax.swing.JFrame;
 import java.awt.Color;
 import java.awt.BorderLayout;
@@ -230,13 +228,18 @@ public class ServerWindow extends JFrame implements FocusListener {
 		
 		try {
 			while(true) {
-				myServerSocket = new ServerSocket(PORT);
+				myServerSocket = new ServerSocket(PORT, 10);
 				appendMessage("Waiting for someone to connect...");
 				mySocket = myServerSocket.accept();
-					
+				
 				outputStream = new ObjectOutputStream(mySocket.getOutputStream());
 				outputStream.flush(); //cleans up leftover data
 				inputStream = new ObjectInputStream(mySocket.getInputStream());
+				
+				Runnable listen = new clientListener(mySocket);
+				Thread thread1 = new Thread(listen);
+				thread1.start();
+				
 				chatSession();
 			}//end while loop
 		}//end try statement
@@ -261,10 +264,7 @@ public class ServerWindow extends JFrame implements FocusListener {
 			do {
 				//type cast the inputStream message to a string
 				message = (String)inputStream.readObject();
-				if(message.equals(END_MESSAGE)) {
-					System.out.println("Stop chatting.");
-				}
-				else {
+				if(!message.equals(END_MESSAGE)) {
 					appendMessage(message);
 				}
 			} while(!message.equals(END_MESSAGE));
@@ -324,35 +324,32 @@ public class ServerWindow extends JFrame implements FocusListener {
 		);
 	}//end appendMessage() method
 	
-//	private class ClientHandler extends Thread {
-//		private Socket mySocket;
-//		
-//		private ClientHandler(Socket mySocket) {
-//			this.mySocket = mySocket;
-//		}
-//		
-//		@Override
-//		public void run() {
-//			
-//			try {
-//				myServerSocket = new ServerSocket(PORT);
-//				mySocket = myServerSocket.accept();
-//				outputStream = new ObjectOutputStream(mySocket.getOutputStream());
-//				outputStream.flush(); //cleans up leftover data
-//				inputStream = new ObjectInputStream(mySocket.getInputStream());
-//				
-//				while(true) {
-//					chatSession();
-//				}
-//			}
-//			catch(IOException ioe) {
-//				System.out.println("An error has occurred.");
-//			}
-//			finally {
-//				cleanUp();
-//			}
-//		}
-//	}
+	private class clientListener extends Thread {
+		private Socket mySocket;
+		
+		private clientListener(Socket mySocket) {
+			this.mySocket = mySocket;
+		}
+		
+		@Override
+		public void run() {
+			
+			try {
+				while(true) {
+					mySocket = myServerSocket.accept();
+					
+					outputStream = new ObjectOutputStream(mySocket.getOutputStream());
+					outputStream.flush(); //cleans up leftover data
+					inputStream = new ObjectInputStream(mySocket.getInputStream());
+					chatSession();
+				}//end while loop
+			}//end try statement
+			catch(IOException ioe) {
+				System.out.println("An error occurred in the startSession() method of the server.");
+			}
+			finally {
+				cleanUp();
+			}
+		}
+	}
 }//end ChatWindow class
-
-
