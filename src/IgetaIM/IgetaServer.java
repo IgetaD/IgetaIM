@@ -1,5 +1,3 @@
-package seesaw;
-
 import javax.swing.JOptionPane;
 
 public class IgetaServer {
@@ -12,10 +10,9 @@ public class IgetaServer {
 			server.startSession();
 		}
 		catch(NullPointerException npe) {
-			JOptionPane.showMessageDialog(null, "An error hass occurred, please restart program.");
+			JOptionPane.showMessageDialog(null, "An error has occurred, please restart program.");
 		}
 		
-
 	}//end main() method
-}//end MessengerApp class
+}//end IgetaServer class
 
