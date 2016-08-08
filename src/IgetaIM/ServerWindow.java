@@ -14,6 +14,8 @@ import java.net.*;
 import java.awt.event.*;
 import javax.swing.*;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.LinkedList;
 
 /**
  * Create the window for the server and all its connections
@@ -24,9 +26,15 @@ import java.time.LocalTime;
 public class ServerWindow extends JFrame implements FocusListener {
 	
 	//instance variables to create GUI chat window
-	private static final int WIDTH = 400;
-	private static final int LENGTH = 500;
-	private static final String DEFAULT_MESSAGE = "Type message here...";
+	private static final int WIDTH 							= 400;
+	private static final int LENGTH 						= 500;
+	private static final String DEFAULT_MESSAGE 			= "Type message here...";
+	private final String PADDING 							= "    ";
+	private final String END_MESSAGE 						= "82141b52d4a7cbbcb87a81515c443453a2d5";
+	private final String serverUsername 					= "SERVER";
+	private final int PORT 									= 8214;
+	private static ArrayList<ClientConnection> clientList 	= new ArrayList<>();
+	private static LinkedList<String> messageQueue 			= new LinkedList<>();
 	private JPanel displayPanel;
 	private JTextField textInputBox;
 	private JTextArea textArea;
@@ -37,17 +45,14 @@ public class ServerWindow extends JFrame implements FocusListener {
 	private JMenu systemList;
 	private JMenuItem endChatItem;
 	private JMenuItem exitItem;
-	private String serverUsername = "SERVER";
-	private final String PADDING = "    ";
-	private final String END_MESSAGE = "82141b52d4a7cbbcb87a81515c443453a2d5";
 	
 	//instance variables for establishing connections
-	private ObjectOutputStream outputStream;
-	private ObjectInputStream inputStream;
-	private ServerSocket myServerSocket;
-	private Socket mySocket;
-	private final int PORT = 8214;
+	private ServerSocket serverSocket;
+	private Socket clientSocket;
 	
+	/**
+	 * Class that creates the server's window and components
+	 */
 	public ServerWindow() {
 		super("IgetaIM - Server");
 
@@ -58,20 +63,28 @@ public class ServerWindow extends JFrame implements FocusListener {
 		this.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		this.addWindowListener(new WindowAdapter() {
 			/**
-			 * Asks user if they wish to close the program
+			 * Prompts user for confirmation to end program
 			 */
 			@Override
 			public void windowClosing(WindowEvent windowEvent) {
 				int choice = 0;
 				choice = JOptionPane.showConfirmDialog(null, "Are you sure you want to exit?", "Prompt", JOptionPane.YES_NO_OPTION);
 				if(choice == 0) {
-					transmitMessage(serverUsername + " has ended the session.");
-					transmitMessage(END_MESSAGE);
-					System.exit(0);
-				}
-				else {
-					//do nothing
-				}
+					//if a connection exists send message to clients before terminating
+					if(clientSocket != null) {
+						if(clientList.size() > 0) {
+							for(int i = 0; i < clientList.size(); i++) {
+								clientList.get(i).transmitMessage(serverUsername + " has ended the session.");
+								clientList.get(i).transmitMessage(END_MESSAGE);
+							}//and inner for loop
+						}//end if statement
+						System.exit(0);
+					}
+					else {
+						//if no connections exist simply exit program
+						System.exit(0);
+					}
+				}//end if statement
 			}//end windowClosing() method
 		});//end WindowAdapter anonymous class
 		
@@ -86,8 +99,8 @@ public class ServerWindow extends JFrame implements FocusListener {
 		textArea.setForeground(Color.GREEN);	//set text color 
 		textArea.setBackground(Color.DARK_GRAY);//set background color
 		scrollPane = new JScrollPane(textArea);
+		//adds the component to the panel with a scrollPane
 		displayPanel.add(scrollPane, BorderLayout.CENTER);
-		
 		
 		//create the component where user will input text
 		textInputBox = new JTextField(255);
@@ -98,62 +111,70 @@ public class ServerWindow extends JFrame implements FocusListener {
 		textInputBox.setEditable(true);
 //		textInputBox.addMouseListener(new MyMouseListener());
 		textInputBox.addFocusListener(this);
+		
 		textInputBox.addActionListener(
 				new ActionListener() {
 					public void actionPerformed(ActionEvent event) {
 						String input = textInputBox.getText();
 						input.trim();
 						if(input.length() < 1) {
-						//do nothing
+							//do nothing
 						}
-						else if(mySocket == null) {
+						else if(clientList.size() == 0) {
 							appendMessage(input + "\n" + PADDING + "You currently have no active chat sessions.");
+							textInputBox.setText("");
 						}
 						else {
-							transmitMessage("(" + LocalTime.now() + ") " + serverUsername + " - " + input);
-							appendMessage("(" + LocalTime.now() + ") " + serverUsername + " - " + input);
+							synchronized(this) {
+								for(int i = 0; i < clientList.size(); i++) {
+									clientList.get(i).transmitMessage("(" + LocalTime.now() + ") " + serverUsername + ": " + input);
+								}
+							}//end synchronized
+							appendMessage("(" + LocalTime.now() + ") " + serverUsername + ": " + input);
 							textInputBox.setText("");
 						}
 					}//end actionPerformed() method
 				}//end ActionListener Object
 		);//end anonymous inner class
 		
-		
+		//adds the component to the panel
 		displayPanel.add(textInputBox, BorderLayout.SOUTH);
-		
 		//adds the two panels created to the JFrame
 		this.add(displayPanel);
 		
 		//JMenuBar is a container for JMenu
 		menuBar = new JMenuBar();
-		//JMenu is a container for JMenuItems
+		//Creates JMenu items to go inside JMenuBar
 		fileList = new JMenu("File");
 		viewList = new JMenu("View");
-		endChatItem = new JMenuItem("End Session");
 		systemList = new JMenu("System");
+		//Creates JMenuItems to go inside JMenus
+		endChatItem = new JMenuItem("End Session");
 		exitItem = new JMenuItem("Exit");
+		//assigns a listener to exitItem using an inner MyListener class
 		exitItem.addActionListener(new MyListener());
+		
+		//adds JMenuItems to their respective JMenus
 		fileList.add(endChatItem);
-		endChatItem.addActionListener(
-			new ActionListener() {
-				public void actionPerformed(ActionEvent event) {
-					transmitMessage(serverUsername + " has ended the session.");
-					transmitMessage(END_MESSAGE);
-				}
-			}
-		);
 		systemList.add(exitItem);
 		menuBar.add(fileList);
 		menuBar.add(viewList);
 		menuBar.add(systemList);
-		setJMenuBar(menuBar);
+		//adds the menuBar to the JFrame
+		this.setJMenuBar(menuBar);
 	}
 	
+	/**
+	 * Clears the textInputBox when user clicks in the field
+	 */
 	@Override
 	public void focusGained(FocusEvent e) {
 		textInputBox.setText("");
     }
 	
+	/**
+	 * Sets textInputBox to default message when focus is lost in field
+	 */
 	@Override
     public void focusLost(FocusEvent e) {
         textInputBox.setText(DEFAULT_MESSAGE);
@@ -175,9 +196,20 @@ public class ServerWindow extends JFrame implements FocusListener {
 				int choice = 0;
 				choice = JOptionPane.showConfirmDialog(null, "Are you sure you want to exit?", "Prompt", JOptionPane.YES_NO_OPTION);
 				if(choice == 0) {
-					transmitMessage(serverUsername + " has ended the session.");
-					transmitMessage(END_MESSAGE);
-					System.exit(0);
+					//if a connection exists send message to clients before terminating
+					if(clientSocket != null) {
+						if(clientList.size() > 0) {
+							for(int i = 0; i < clientList.size(); i++) {
+								clientList.get(i).transmitMessage(serverUsername + " has ended the session.");
+								clientList.get(i).transmitMessage(END_MESSAGE);
+							}//and inner for loop
+						}//end if statement
+						System.exit(0);
+					}
+					else {
+						//if no connections exist simply exit program
+						System.exit(0);
+					}
 				}
 			}
 		}//end actionPerformed() method
@@ -227,86 +259,27 @@ public class ServerWindow extends JFrame implements FocusListener {
 	public void startSession() {
 		
 		try {
+			serverSocket = new ServerSocket(PORT, 10);
+			appendMessage("Waiting for someone to connect...");
+			
 			while(true) {
-				myServerSocket = new ServerSocket(PORT, 10);
-				appendMessage("Waiting for someone to connect...");
-				mySocket = myServerSocket.accept();
+				/*
+				 * waits for a new socket to be returned by accept() method
+				 * accept() method is typically placed in a loop
+				 */
+				clientSocket = serverSocket.accept();
 				
-				outputStream = new ObjectOutputStream(mySocket.getOutputStream());
-				outputStream.flush(); //cleans up leftover data
-				inputStream = new ObjectInputStream(mySocket.getInputStream());
-				
-				Runnable listen = new clientListener(mySocket);
-				Thread thread1 = new Thread(listen);
-				thread1.start();
-				
-				chatSession();
+				ClientConnection clientHandler = new ClientConnection(clientSocket);
+				Thread myThread = new Thread(clientHandler);
+				clientList.add(clientHandler);
+				myThread.start();
 			}//end while loop
 		}//end try statement
 		catch(IOException ioe) {
-			System.out.println("An error occurred in the startSession() method of the server.");
-		}
-		finally {
-			cleanUp();
+			JOptionPane.showMessageDialog(null, "The server program is already running.");
+			System.exit(0);
 		}
 	}//end startSession() method
-	
-	/**
-	 * Transmits messages to display area while a connection is established
-	 * @throws IOException
-	 */
-	private void chatSession() throws IOException {
-		String message = "";
-		//tell the client they have connected to the server's session
-		transmitMessage("You have joined " + serverUsername + "'s session.");
-		
-		try {
-			do {
-				//type cast the inputStream message to a string
-				message = (String)inputStream.readObject();
-				if(!message.equals(END_MESSAGE)) {
-					appendMessage(message);
-				}
-			} while(!message.equals(END_MESSAGE));
-		}
-		catch (ClassNotFoundException cnf) {
-			System.out.println("An error has occurred in server chatSession() method!");
-		}
-		finally {
-			System.out.println("Exiting chat session...");
-		}
-	}//end chatSession() method
-	
-	/**
-	 * Closes streams and connections
-	 */
-	private void cleanUp() {
-		System.out.println("Server clean up.");
-		try {
-			outputStream.close();
-			inputStream.close();
-			myServerSocket.close();
-			mySocket.close();
-		}
-		catch(IOException ioe) {
-			System.out.println("An error has occurred in the server's cleanUp() method.");
-		}
-	}//end cleanUp() method
-	
-	/**
-	 * Transmits message and flushes extra data
-	 * @param message
-	 * @throws IOException
-	 */
-	private void transmitMessage(String message) {
-		try {
-			outputStream.writeObject(message);
-			outputStream.flush();
-		}
-		catch(IOException ioe) {
-			System.out.println("An error has occurred in the server's transmitMessage() method.");
-		}
-	}//end transmitMessage() method
 	
 	/**
 	 * Displays a message to the textArea box
@@ -324,11 +297,22 @@ public class ServerWindow extends JFrame implements FocusListener {
 		);
 	}//end appendMessage() method
 	
-	private class clientListener extends Thread {
-		private Socket mySocket;
+	/**
+	 * Each client's communication is handled by a different thread
+	 * @author IgetaD
+	 *
+	 */
+	private class ClientConnection extends Thread {
+		private Socket clientSocket;
+		private ObjectOutputStream outputStream;
+		private ObjectInputStream inputStream;
 		
-		private clientListener(Socket mySocket) {
-			this.mySocket = mySocket;
+		/**
+		 * ClientConnection constructor
+		 * @param clientSocket
+		 */
+		private ClientConnection(Socket clientSocket) {
+			this.clientSocket = clientSocket;
 		}
 		
 		@Override
@@ -336,20 +320,111 @@ public class ServerWindow extends JFrame implements FocusListener {
 			
 			try {
 				while(true) {
-					mySocket = myServerSocket.accept();
-					
-					outputStream = new ObjectOutputStream(mySocket.getOutputStream());
-					outputStream.flush(); //cleans up leftover data
-					inputStream = new ObjectInputStream(mySocket.getInputStream());
+					//creates stream to send messages to client
+					outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+					outputStream.flush();
+					//creates stream to receive messages from client
+					inputStream = new ObjectInputStream(clientSocket.getInputStream());
 					chatSession();
 				}//end while loop
 			}//end try statement
 			catch(IOException ioe) {
-				System.out.println("An error occurred in the startSession() method of the server.");
+				//do nothing
 			}
 			finally {
-				cleanUp();
+				disconnectClient();
 			}
-		}
-	}
-}//end ChatWindow class
+		}//end run() method
+		
+		/**
+		 * Transmits messages to display area while a connection is established
+		 * @throws IOException
+		 */
+		private void chatSession() throws IOException {
+			String message = "";
+			//tell the client they have connected to the server's session
+			transmitMessage("You have joined " + serverUsername + "'s session.");
+
+			try {
+				do {
+					//type cast the inputStream message to a string
+					message = (String)inputStream.readObject();
+					messageQueue.offer(message);
+					broadcastMessage(message);
+					
+					if(!message.equals(END_MESSAGE)) {
+						//appends message to server's chat window
+						appendMessage(message);
+					}
+				} while(!message.equals(END_MESSAGE));
+			}
+			catch (ClassNotFoundException cnf) {
+				System.out.println("An error has occurred in server chatSession() method!");
+			}
+		}//end chatSession() method
+		
+		/**
+		 * Transmits message and flushes extra data
+		 * @param message
+		 * @throws IOException
+		 */
+		private void transmitMessage(String message) {
+			try {
+				outputStream.writeObject(message);
+				outputStream.flush();
+			}
+			catch(IOException ioe) {
+				System.out.println("The server's message was unable to be transmitted.");
+			}
+		}//end transmitMessage() method
+		
+		private void broadcastMessage(String message) {
+			synchronized(this) {
+				//loops through messageQueue
+				for(int i = 0; i < messageQueue.size(); i++) {
+					String s = "";
+					s = messageQueue.poll();
+					//broadcasts message to all clients
+					for(int j = 0; j < clientList.size(); j++) {
+						clientList.get(j).transmitMessage(s);
+					}
+				}//end for loop
+			}
+		}//end broadcastMessage() method
+		
+		/**
+		 * Closes streams and connections
+		 */
+		private void disconnectClient() {
+
+			try {
+				outputStream.close();
+				inputStream.close();
+				clientSocket.close();
+				scrubClientList();
+				if(clientList.size() == 0) {
+					appendMessage("Waiting for someone to connect...");
+				}
+			}
+			catch(IOException ioe) {
+				System.out.println("An error has occurred in the server's disconnect() method.");
+			}
+			catch(IndexOutOfBoundsException out) {
+				System.out.println("Index out of range.");
+			}
+		}//end disconnect() method
+		
+		/**
+		 * Goes through clientList to remove disconnected sockets
+		 */
+		private void scrubClientList() {
+			for(int i = 0; i < clientList.size(); i++) {
+				if(clientList.get(i).clientSocket.isClosed()) {
+					clientList.remove(i);
+				}
+			}//end for loop
+		}//end scrubClientList method
+		
+	}//end ClientConnection class
+	
+}//end ServerWindow class
