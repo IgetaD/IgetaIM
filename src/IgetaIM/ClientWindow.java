@@ -303,4 +303,4 @@ public class ClientWindow extends JFrame implements FocusListener {
 		);
 	}//end appendMessage() method
 	
-}//end ChatWindow class
+}//end ClientWindow class
