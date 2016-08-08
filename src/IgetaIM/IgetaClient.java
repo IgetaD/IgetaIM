@@ -17,4 +17,4 @@ public class IgetaClient {
 		
 	}//end main() method
 	
-}//end ClientTest class
+}//end IgetaClient class
