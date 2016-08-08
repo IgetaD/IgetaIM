@@ -1,5 +1,3 @@
-package seesaw;
-
 import javax.swing.JOptionPane;
 
 public class IgetaClient {
