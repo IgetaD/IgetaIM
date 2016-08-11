@@ -3,7 +3,6 @@ package igetaIm.client;
 import javax.swing.JFrame;
 import java.awt.Color;
 import java.awt.Font;
-//import java.awt.Dimension;
 import java.awt.BorderLayout;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
@@ -109,7 +108,6 @@ public class Client extends JFrame implements FocusListener {
 		textInputBox = new JTextField(255);
 		textInputBox.setText(DEFAULT_MESSAGE);
 		textInputBox.setEditable(true);
-//		textInputBox.addMouseListener(new MyMouseListener());
 		textInputBox.addFocusListener(this);
 		
 		//creates color list in Edit menu
@@ -246,44 +244,6 @@ public class Client extends JFrame implements FocusListener {
 			}
 		}//end actionPerformed() method
 	}//end MyListener class
-	
-	/**
-	 * Private inner class for mouse listeners
-	 * @author IgetaD
-	 *
-	 */
-//	private class MyMouseListener implements MouseListener {
-//		
-//		@Override
-//		public void mouseReleased(MouseEvent mEvent) {
-//			//do nothing
-//		}
-//		
-//		@Override
-//		public void mousePressed(MouseEvent mEvent) {
-//			if(textInputBox.getText().equals(DEFAULT_MESSAGE)) {
-//				textInputBox.setText("");
-//			}
-//			else {
-//				//do nothing
-//			}
-//		}
-//		
-//		@Override
-//		public void mouseExited(MouseEvent mEvent) {
-//			//do nothing
-//		}
-//		
-//		@Override
-//		public void mouseEntered(MouseEvent mEvent) {
-//			//do nothing
-//		}
-//		
-//		@Override
-//		public void mouseClicked(MouseEvent mEvent) {
-//			//do nothing
-//		}
-//	}
 	
 	/**
 	 * Starts connections and streams
