@@ -322,7 +322,10 @@ public class Server extends JFrame implements FocusListener {
 				
 				ClientConnection clientHandler = new ClientConnection(clientSocket);
 				Thread myThread = new Thread(clientHandler);
-				clientList.add(clientHandler);
+				
+				synchronized(this) {
+					clientList.add(clientHandler);
+				}
 				myThread.start();
 			}//end while loop
 		}//end try statement
@@ -446,14 +449,16 @@ public class Server extends JFrame implements FocusListener {
 
 			try {
 				do {
-					//type cast the inputStream message to a string
-					message = (String)inputStream.readObject();
-					messageQueue.offer(message);
-					broadcastMessage(message);
-					
-					if(!message.equals(END_MESSAGE)) {
-						//appends message to server's chat window
-						appendMessage(message);
+					synchronized(this) {
+						//type cast the inputStream message to a string
+						message = (String)inputStream.readObject();
+						messageQueue.offer(message);
+						broadcastMessage(message);
+						
+						if(!message.equals(END_MESSAGE)) {
+							//appends message to server's chat window
+							appendMessage(message);
+						}
 					}
 				} while(!message.equals(END_MESSAGE));
 			}
